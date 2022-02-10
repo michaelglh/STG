@@ -22,19 +22,23 @@ class Simulator():
     dt: float = 0.1     # ms
 
     def __post_init__(self):
-        # devices
         self.devices = []
 
     def reg(self, devices):
+        """Register devices included in simulation
+
+        Args:
+            devices (instances): neurons, input generators, etc
+        """        
         self.devices += devices
 
     def run(self, T):
         ts = list(range(0, int(T/self.dt)))
         # initialize devices for simulation
         for dev in self.devices:
-            dev.initsim(len(ts), self.dt)
+            dev.__initsim__(len(ts), self.dt)
 
         # run the simulation
         for it in ts[:-1]:
             for dev in self.devices:
-                dev.step(it)
+                dev.__step__(it)

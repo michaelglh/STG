@@ -21,7 +21,15 @@ class Poisson_generator():
     #         if not isinstance(field.default, dataclass._MISSING_TYPE) and getattr(self, field.name) is None:
     #             setattr(self, field.name, field.default)
 
-    def initsim(self, Lt, dt):
+    def __initsim__(self, Lt, dt):
+        """Initialization for simualtion
+
+        Generate sequence of spike trains following Poisson distribution
+
+        Args:
+            Lt (int): number of timesteps
+            dt (float): timestep size
+        """
         self.Lt = Lt
         self.dt = dt
 
@@ -40,45 +48,18 @@ class Poisson_generator():
         # initial state
         self.spike = self.spike_train[0]
         
-    def step(self, it):
+    def __step__(self, it):
+        """Update current output state
+
+        Args:
+            it (int): current iteration index
+        """        
         self.spike = self.spike_train[it]
 
     def set_pars(self, pars):
+        """Update parameters of generator
+
+        Args:
+            pars (dict): rate, random seed, etc.
+        """        
         self.pars = pars
-
-    def gen(self, myseed=False):
-    
-        '''
-        Generates poisson trains
-        Expects:
-        pars       : parameter dictionary
-        rate       : noise amplitute [Hz]
-        n          : number of Poisson trains
-        myseed     : random seed. int or boolean
-        
-        Returns:
-        poisson_train : spike train matrix, ith row represents whether
-                        there is a spike in ith spike train over time
-                        (1 if spike, 0 otherwise)
-        '''
-        
-        # Retrieve simulation parameters
-        dt, range_t = self.pars['dt'], self.pars['range_t']
-        Lt = range_t.size
-
-        rate = self.pars['rate']
-        n = self.pars['n']
-        
-        # set random seed
-        if myseed:
-            np.random.seed(seed=myseed) 
-        else:
-            np.random.seed()
-        
-        # generate uniformly distributed random variables
-        u_rand = np.random.rand(n, Lt)
-        
-        # generate Poisson train
-        poisson_train = 1. * (u_rand<rate*dt/1000.)
-        
-        return poisson_train

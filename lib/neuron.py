@@ -8,7 +8,9 @@ from .conn import StaticCon
 
 @dataclass
 class LIF:
-    """Integrate and firing neuron"""
+    """Integrate and firing neuron
+    Default value to typical neuron parameters and static synapse parameters
+    """
     name: str = 'LIF'           # type
 
     #! neuron parameters
@@ -32,15 +34,21 @@ class LIF:
     spike: int = 0          # spiking or not
 
     def __post_init__(self):
+        """Initialize input device lists
+        """        
         self.inp = {'Poisson':[], 'Istep':[]}
 
-    def connect_syn(self, device, synspec):
-        self.inp[device.name].append({'device':device, 'syn':StaticCon(synspec)})
+    def __initsim__(self, Lt, dt):
+        """Initialization for simualtion
 
-    def connect(self, name, device, weight):
-        self.inp[name].append({'device':device, 'weight':weight})
+        Recording arrays of potential, conductances, spiking state etc
 
-    def initsim(self, Lt, dt):
+        Init state of the neuron
+
+        Args:
+            Lt (int): number of timesteps
+            dt (float): timestep size
+        """
         # simulation setting
         self.dt = dt
         self.Lt = Lt
@@ -53,9 +61,22 @@ class LIF:
         self.v[0] = self.V_init
         self.tr = 0.
         self.spike = 0
-        self.current = 0.
 
-    def load_in(self):
+    def connect(self, device, synspec):
+        """Connect device to neuron with specification on synapse
+
+        Args:
+            device (instance): input device
+            synspec (dict): weight, delay, etc.
+        """        
+        self.inp[device.name].append({'device':device, 'syn':StaticCon(synspec)})
+
+    def __load_in__(self):
+        """Load input from input devices
+
+        Returns:
+            excitatory spikes, inhibitory spikes and current flow
+        """        
         # spike trains
         pre_spike_ex = 0.
         pre_spike_in = 0.
@@ -73,7 +94,15 @@ class LIF:
 
         return pre_spike_ex, pre_spike_in, I
 
-    def step(self, it):
+    def __step__(self, it):
+        """Simulation for one step
+
+        Args:
+            it (int): current iteration index
+
+        Returns:
+            float: change in potential
+        """        
         # retrieve parameters
         V_th, V_reset, E_L = self.V_th, self.V_reset, self.E_L
         tau_m, g_L = self.tau_m, self.g_L
@@ -84,7 +113,7 @@ class LIF:
         dt = self.dt
 
         # update dynamic variables
-        pre_spike_ex, pre_spike_in, I = self.load_in()
+        pre_spike_ex, pre_spike_in, I = self.__load_in__()
         self.spike = 0
         if self.tr > 0:                      # freactory period
             self.v[it] = V_reset
@@ -106,100 +135,4 @@ class LIF:
         self.v[it+1] = self.v[it] + dv
 
         return dv
-
-    def run(self, T, dt):
-        '''
-        conductance-based LIF dynamics
-        
-        Expects:
-        pars               : parameter dictionary
-        I_inj              : injected current [pA]. The injected current here can be a value or an array
-        pre_spike_train_ex : spike train input from presynaptic excitatory neuron
-        pre_spike_train_in : spike train input from presynaptic inhibitory neuron
-        
-        Returns:
-        rec_spikes : spike times
-        rec_v      : mebrane potential
-        gE         : postsynaptic excitatory conductance
-        gI         : postsynaptic inhibitory conductance
-        '''
-        
-        # # Retrieve parameters
-        # V_th, V_reset = self.pars['V_th'], self.pars['V_reset']
-        # tau_m, g_L = self.pars['tau_m'], self.pars['g_L']
-        # V_init, E_L = self.pars['V_init'], self.pars['E_L']
-        # gE_bar, gI_bar = self.pars['gE_bar'], self.pars['gI_bar']
-        # VE, VI = self.pars['VE'], self.pars['VI']
-        # tau_syn_E, tau_syn_I = self.pars['tau_syn_E'], self.pars['tau_syn_I']
-        # tref = self.pars['tref'] 
-
-        V_th, V_reset = self.V_th, self.V_reset
-        tau_m, g_L = self.tau_m, self.g_L
-        V_init, E_L = self.V_init, self.E_L
-        gE_bar, gI_bar = self.gE_bar, self.gI_bar
-        VE, VI = self.VE, self.VI
-        tau_syn_E, tau_syn_I = self.tau_syn_E, self.tau_syn_I
-        tref = self.tref
-
-        range_t = np.arange(0., T, dt)
-        Lt = range_t.size
-
-        pre_spike_train_ex = np.zeros((1,Lt))
-        pre_spike_train_in = np.zeros((1,Lt))
-        I = np.zeros((1,Lt))
-        for name, inps in self.inp.items():
-            if name == 'Poisson':
-                for inp in inps:
-                    spike_train = inp['device'].gen()
-
-                    spike_cut = np.zeros((spike_train.shape[0], Lt))
-                    if spike_train.shape[1] < Lt:                           # cut to time length Lt
-                        spike_cut[:, spike_train.shape[1]] = spike_train
-                    else:
-                        spike_cut = spike_train[:, :Lt]
-                    spike_cut *= np.absolute(inp['weight'])
-
-                    if inp['weight'] > 0:                                   # add to input spike trains
-                        pre_spike_train_ex = np.concatenate([pre_spike_train_ex, spike_cut], axis=0)
-                    else:
-                        pre_spike_train_in = np.concatenate([pre_spike_train_in, spike_cut], axis=0)
-            
-            if name == 'Istep':
-                for inp in inps:
-                    I += inp['device'].gen() * inp['weight']
-                        
-        pre_spike_train_ex_total = pre_spike_train_ex.sum(axis=0)
-        pre_spike_train_in_total = pre_spike_train_in.sum(axis=0)
-        I = I.sum(axis=0)
-        
-        # Initialize
-        tr = 0.
-        v = np.zeros(Lt)
-        v[0] = V_init
-        gE = np.zeros(Lt)
-        gI = np.zeros(Lt)
-
-        # simulation
-        rec_spikes = [] # recording spike times
-        for it in range(Lt-1):
-            if tr >0:
-                v[it] = V_reset
-                tr = tr-1
-            elif v[it] >= V_th:         #reset voltage and record spike event
-                rec_spikes.append(it)
-                v[it] = V_reset
-                tr = tref/dt
-            #update the synaptic conductance
-            gE[it+1] = gE[it] - (dt/tau_syn_E)*gE[it] + gE_bar*pre_spike_train_ex_total[it+1]
-            gI[it+1] = gI[it] - (dt/tau_syn_I)*gI[it] + gI_bar*pre_spike_train_in_total[it+1]
-                
-            #calculate the increment of the membrane potential
-            dv = (-(v[it]-E_L) - (gE[it+1]/g_L)*(v[it]-VE) - (gI[it+1]/g_L)*(v[it]-VI) + I[it]/g_L) * (dt/tau_m)
-
-            #update membrane potential
-            v[it+1] = v[it] + dv
-            
-        rec_spikes = np.array(rec_spikes) * dt
-            
-        return v, rec_spikes, gE, gI
     
