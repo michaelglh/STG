@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np                 # import numpy
 
 import matplotlib.pyplot as plt    # import matplotlib
@@ -11,7 +12,10 @@ class LIF:
     """Integrate and firing neuron
     Default value to typical neuron parameters and static synapse parameters
     """
+    sim: any
+
     name: str = 'LIF'           # type
+    otype: str = 'Spikes'
 
     #! neuron parameters
     V_init: float = -75.       # initial potential [mV]
@@ -34,9 +38,13 @@ class LIF:
     spike: int = 0          # spiking or not
 
     def __post_init__(self):
-        """Initialize input device lists
+        """Initialize device
         """        
-        self.inp = {'Poisson':[], 'Istep':[]}
+        self.idx = self.sim.cnt
+        self.sim.cnt += 1
+        self.sim.devices.append(self)
+
+        self.inp = {'Spikes':[], 'Istep':[]}
 
     def __initsim__(self, Lt, dt):
         """Initialization for simualtion
@@ -69,7 +77,7 @@ class LIF:
             device (instance): input device
             synspec (dict): weight, delay, etc.
         """        
-        self.inp[device.name].append({'device':device, 'syn':StaticCon(synspec)})
+        self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
 
     def __load_in__(self):
         """Load input from input devices
@@ -80,7 +88,7 @@ class LIF:
         # spike trains
         pre_spike_ex = 0.
         pre_spike_in = 0.
-        for inp in self.inp['Poisson']:
+        for inp in self.inp['Spikes']:
             spike_in = inp['device'].spike
             if inp['syn'].weight > 0:
                 pre_spike_ex += spike_in * inp['syn'].weight
