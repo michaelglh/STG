@@ -4,6 +4,7 @@ import numpy as np                 # import numpy
 import matplotlib.pyplot as plt    # import matplotlib
 
 from dataclasses import dataclass, fields
+from collections import deque
 
 from .conn import StaticCon
 
@@ -70,6 +71,11 @@ class LIF:
         self.tr = 0.
         self.spike = 0
 
+        # initi synapses
+        for itype in ['Spikes', 'Istep']:
+            for inp in self.inp[itype]:
+                inp['buffer'] = deque(int(inp['syn'].delay/dt+1)*[0], int(inp['syn'].delay/dt)+1)
+
     def connect(self, device, synspec):
         """Connect device to neuron with specification on synapse
 
@@ -89,7 +95,8 @@ class LIF:
         pre_spike_ex = 0.
         pre_spike_in = 0.
         for inp in self.inp['Spikes']:
-            spike_in = inp['device'].spike
+            inp['buffer'].appendleft(inp['device'].spike)
+            spike_in = inp['buffer'][-1]
             if inp['syn'].weight > 0:
                 pre_spike_ex += spike_in * inp['syn'].weight
             else:
@@ -98,7 +105,8 @@ class LIF:
         # current injections
         I = 0.
         for inp in self.inp['Istep']:
-            I += inp['device'].current * inp['syn'].weight
+            inp['buffer'].appendleft(inp['device'].current)
+            I += inp['buffer'][-1] * inp['syn'].weight
 
         return pre_spike_ex, pre_spike_in, I
 

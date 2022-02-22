@@ -66,7 +66,7 @@ class Simulator():
         for dev in self.devices:
             dev.__initsim__(len(ts), self.dt)
 
-        # run the simulation
+        # run the simulation step by step
         for it in ts[:-1]:
             for dev in self.devices:
                 dev.__step__(it)
