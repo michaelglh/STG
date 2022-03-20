@@ -1,6 +1,6 @@
-import numpy as np                 # import numpy
+import numpy as np
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
 @dataclass
 class Poisson_generator():
@@ -56,6 +56,51 @@ class Poisson_generator():
             it (int): current iteration index
         """        
         self.spike = self.spike_train[it]
+
+    def set_pars(self, pars):
+        """Update parameters of generator
+
+        Args:
+            pars (dict): rate, random seed, etc.
+        """        
+        self.pars = pars
+
+@dataclass
+class Current_injector():
+    """Step-wise current injection"""
+    sim: any
+    Is: any
+    otype: str = 'Istep'  # type
+
+    #! state of generator
+    current: int = 0          # spiking or not
+
+    def __post_init__(self):
+        """Initialize device
+        """        
+        self.idx = self.sim.cnt
+        self.sim.cnt += 1
+        self.sim.__reg__(self)
+
+    def __initsim__(self, Lt, dt):
+        """Initialization for simualtion
+
+        Generate sequence of current injection following Gaussian distribution
+
+        Args:
+            Lt (int): number of timesteps
+            dt (float): timestep size
+        """
+        self.Lt = Lt
+        self.dt = dt
+
+    def __step__(self, it):
+        """Update current output state
+
+        Args:
+            it (int): current iteration index
+        """        
+        self.current = self.Is[it]
 
     def set_pars(self, pars):
         """Update parameters of generator

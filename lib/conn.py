@@ -1,10 +1,8 @@
-import numpy as np                 # import numpy
-
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
 class StaticCon():
     """Static synapse"""
-     #! parameters
+    #! parameters
     weight: float = 1.
     delay: float = 5.   # ms
 
@@ -14,6 +12,72 @@ class StaticCon():
                 setattr(self, k, v)
             except:
                 "Invalid parameter for static synapse!"
+
+    def __update__(self, spike):
+        return self.weight
+
+class FaciCon():
+    """Facilitating synapse"""
+    #! parameters
+    weight: float = 1.
+    delay: float = 5.   # ms
+
+    p_init: float = 0.5
+    fF: float = 0.01    # facilitation strength
+    tau_FP: float = 2e2 # facilitation time constant
+
+    def __init__(self, synspec):
+        for k,v in synspec.items():
+            try:
+                setattr(self, k, v)
+            except:
+                "Invalid parameter for facilicating synapse!"
+        self.prel = self.p_init
+
+    def __update__(self, spike):
+        """update synaptic weight when a spike comes
+
+        Args:
+            spike (int): spiking or not
+
+        Returns:
+            float: synaptic weight
+        """      
+        self.prel += (self.p_init - self.prel)/self.tau_FP + self.fF*(1-self.p_init)*spike
+        
+        return self.weight*self.prel/self.p_init
+
+class DeprCon():
+    """Depressing synapse"""
+    #! parameters
+    weight: float = 1.
+    delay: float = 5.   # ms
+
+    p_init: float = 0.5
+    fD: float = 0.01    # depression scale
+    tau_DP: float = 5e2 # depression time constant
+
+    def __init__(self, synspec):
+        for k,v in synspec.items():
+            try:
+                setattr(self, k, v)
+            except:
+                "Invalid parameter for depressing synapse!"
+        self.prel = self.p_init
+
+    def __update__(self, spike):
+        """update synaptic weight when a spike comes
+
+        Args:
+            spike (int): spiking or not
+
+        Returns:
+            float: synaptic weight
+        """        
+        self.prel += (self.p_init - self.prel)/self.tau_DP - self.fD*self.p_init*spike
+
+        return self.weight*self.prel/self.p_init
+
 
 @dataclass
 class Simulator():
@@ -38,22 +102,19 @@ class Simulator():
             self.devidx.append(dev.idx)
             self.devices.append(dev)
 
-    def connect(self, src, tar, pars):
+    def connect(self, src, tar, synspecs):
         """Connect src pop to tar pop with given parameters
 
         Args:
             src (list): source population
             tar (list): target population
-            pars (dict): connection parameters
+            synspecs (dict): connection parameters
         """
         M, N = len(src), len(tar)
-        conmat = pars['weight']
-        condelay = pars['delay']
 
         for i in range(M):
             for j in range(N):
-                synspec = {'weight': conmat[i,j], 'delay': condelay[i,j]}
-                src[i].connect(tar[j], synspec)
+                src[i].connect(tar[j], synspecs[i][j])
 
     def run(self, T):
         """Run simulation for T

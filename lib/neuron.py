@@ -1,12 +1,11 @@
-from typing import Any
 import numpy as np                 # import numpy
 
 import matplotlib.pyplot as plt    # import matplotlib
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from collections import deque
 
-from .conn import StaticCon
+from .conn import StaticCon, FaciCon, DeprCon
 
 @dataclass
 class LIF:
@@ -19,13 +18,13 @@ class LIF:
     otype: str = 'Spikes'
 
     #! neuron parameters
-    V_init: float = -75.       # initial potential [mV]
-    V_th: float = -55.        # spike threshold [mV]
-    V_reset: float = -65.      # reset potential [mV]
-    E_L: float = -75.          # leak reversal potential [mV]
-    tau_m: float = 10.        # membrane time constant [ms]
-    g_L: float = 10.          # leak conductance [nS]
-    tref: float = 2.         # refractory time (ms)
+    V_init: float = -75.        # initial potential [mV]
+    V_th: float = -55.          # spike threshold [mV]
+    V_reset: float = -65.       # reset potential [mV]
+    E_L: float = -75.           # leak reversal potential [mV]
+    tau_m: float = 10.          # membrane time constant [ms]
+    g_L: float = 10.            # leak conductance [nS]
+    tref: float = 2.            # refractory time (ms)
 
     #! synaptic parameters
     gE_bar: float = 3.       #nS
@@ -34,6 +33,11 @@ class LIF:
     gI_bar: float = 3.       #nS
     VI: float = -80.         #mV
     tau_syn_I: float = 5.    #ms
+
+    #! adaptation
+    a: float = 0.           # subthreshold adaptation
+    b: float = 25.          # spiking adaptation
+    tau_k: float = 100.     #ms
 
     #! state of neuron
     spike: int = 0          # spiking or not
@@ -64,7 +68,7 @@ class LIF:
 
         # dynamics variables
         self.rec_spikes = []
-        self.v, self.gE, self.gI = np.zeros(Lt), np.zeros(Lt), np.zeros(Lt)
+        self.v, self.dv, self.gE, self.gI, self.w = np.zeros(Lt), np.zeros(Lt), np.zeros(Lt), np.zeros(Lt), np.zeros(Lt)
 
         # init states
         self.v[0] = self.V_init
@@ -83,24 +87,32 @@ class LIF:
             device (instance): input device
             synspec (dict): weight, delay, etc.
         """        
-        self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
+        if synspec['ctype'] == 'static':
+            self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
+        elif synspec['ctype'] == 'facilitate':
+            self.inp[device.otype].append({'device':device, 'syn':FaciCon(synspec)})
+        elif synspec['ctype'] == 'depress':
+            self.inp[device.otype].append({'device':device, 'syn':DeprCon(synspec)})
 
     def __load_in__(self):
         """Load input from input devices
 
         Returns:
             excitatory spikes, inhibitory spikes and current flow
-        """        
+        """
         # spike trains
         pre_spike_ex = 0.
         pre_spike_in = 0.
         for inp in self.inp['Spikes']:
+            # update input buffer
             inp['buffer'].appendleft(inp['device'].spike)
             spike_in = inp['buffer'][-1]
+            # update input weight
+            weight = inp['syn'].__update__(spike_in)
             if inp['syn'].weight > 0:
-                pre_spike_ex += spike_in * inp['syn'].weight
+                pre_spike_ex += spike_in * weight
             else:
-                pre_spike_in += spike_in * inp['syn'].weight
+                pre_spike_in += spike_in * weight
 
         # current injections
         I = 0.
@@ -146,9 +158,14 @@ class LIF:
             
         # calculate the increment of the membrane potential
         dv = (-(self.v[it]-E_L) - (self.gE[it+1]/g_L)*(self.v[it]-VE) - (self.gI[it+1]/g_L)*(self.v[it]-VI) + I/g_L) * (dt/tau_m)
+        self.dv[it+1] = dv
+
+        # adaptation
+        self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-E_L) + self.b*self.tau_k*self.spike)* (dt/self.tau_k)
+        self.w[it+1] = 0
 
         # update membrane potential
-        self.v[it+1] = self.v[it] + dv
+        self.v[it+1] = self.v[it] + dv - self.w[it]/g_L
 
         return dv
     
