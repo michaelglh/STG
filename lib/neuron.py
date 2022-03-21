@@ -18,8 +18,8 @@ class LIF:
     otype: str = 'Spikes'
 
     #! neuron parameters
-    V_init: float = -75.        # initial potential [mV]
-    V_th: float = -55.          # spike threshold [mV]
+    V_init: float = -70.        # initial potential [mV]
+    V_th: float = -45.          # spike threshold [mV]
     V_reset: float = -65.       # reset potential [mV]
     E_L: float = -75.           # leak reversal potential [mV]
     tau_m: float = 10.          # membrane time constant [ms]
@@ -37,7 +37,9 @@ class LIF:
     #! adaptation
     a: float = 0.           # subthreshold adaptation
     b: float = 25.          # spiking adaptation
-    tau_k: float = 100.     #ms
+    tau_w: float = 100.     #ms
+    delatT: float = 2.
+    v_rh: float = -50.
 
     #! state of neuron
     spike: int = 0          # spiking or not
@@ -132,40 +134,37 @@ class LIF:
             float: change in potential
         """        
         # retrieve parameters
-        V_th, V_reset, E_L = self.V_th, self.V_reset, self.E_L
-        tau_m, g_L = self.tau_m, self.g_L
-        gE_bar, gI_bar = self.gE_bar, self.gI_bar
-        VE, VI = self.VE, self.VI
-        tau_syn_E, tau_syn_I = self.tau_syn_E, self.tau_syn_I
-        tref = self.tref
+        g_L = self.g_L
         dt = self.dt
 
         # update dynamic variables
         pre_spike_ex, pre_spike_in, I = self.__load_in__()
         self.spike = 0
         if self.tr > 0:                      # freactory period
-            self.v[it] = V_reset
+            self.v[it] = self.V_reset
             self.tr -= 1
-        elif self.v[it] >= V_th:          # reset voltage and record spike event
+        elif self.v[it] >= self.V_th:          # reset voltage and record spike event
             self.rec_spikes.append(it*dt)
-            self.v[it] =  V_reset
-            self.tr = tref/dt
+            self.v[it] =  self.V_reset
+            self.tr = self.tref/dt
             self.spike = 1
 
         # update the synaptic conductance
-        self.gE[it+1] = self.gE[it] - (dt/tau_syn_E)*self.gE[it] + gE_bar*pre_spike_ex
-        self.gI[it+1] = self.gI[it] - (dt/tau_syn_I)*self.gI[it] + gI_bar*np.absolute(pre_spike_in)
+        self.gE[it+1] = self.gE[it] - (dt/self.tau_syn_E)*self.gE[it] + self.gE_bar*pre_spike_ex
+        self.gI[it+1] = self.gI[it] - (dt/self.tau_syn_I)*self.gI[it] + self.gI_bar*np.absolute(pre_spike_in)
             
-        # calculate the increment of the membrane potential
-        dv = (-(self.v[it]-E_L) - (self.gE[it+1]/g_L)*(self.v[it]-VE) - (self.gI[it+1]/g_L)*(self.v[it]-VI) + I/g_L) * (dt/tau_m)
-        self.dv[it+1] = dv
+        # calculate the increment of the membrane potential 
+        dv_reg = -(self.v[it]-self.E_L)
+        dv_inj = self.delatT * np.exp((self.v[it]-self.v_rh)/self.delatT)
+        dv_spk = (self.gE[it+1]/g_L)*(self.v[it]-self.VE) - (self.gI[it+1]/g_L)*(self.v[it]-self.VI)
+        dv_cur = I/g_L
+        self.dv[it+1] = (dv_reg + dv_inj + dv_spk + dv_cur) * (dt/self.tau_m)
 
         # adaptation
-        self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-E_L) + self.b*self.tau_k*self.spike)* (dt/self.tau_k)
-        self.w[it+1] = 0
+        self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-self.E_L) + self.b*self.tau_w*self.spike)* (dt/self.tau_w)
 
         # update membrane potential
-        self.v[it+1] = self.v[it] + dv - self.w[it]/g_L
+        self.v[it+1] = self.v[it] + self.dv[it+1] - self.w[it]/g_L
 
-        return dv
+        return self.v[it+1]
     

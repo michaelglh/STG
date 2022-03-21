@@ -1,7 +1,7 @@
 import numpy as np                 # import numpy
 import matplotlib.pyplot as plt    # import matplotlib
 
-def plot_volt_trace(pars, v, sp):
+def plot_volt_trace(pars, v, sp, axis=None):
     '''
     Plot trajetory of membrane potential for a single neuron
   
@@ -20,10 +20,16 @@ def plot_volt_trace(pars, v, sp):
        sp_num = (sp/dt).astype(int)-1
        v[sp_num] += 10
 
-    plt.plot(pars['range_t'], v, 'b')
-    plt.axhline(V_th, 0, 1, color='k', ls='--')
-    plt.xlabel('Time (ms)')
-    plt.ylabel('V (mV)')
+    if axis is None:
+        plt.plot(range_t, v, 'b')
+        plt.axhline(V_th, 0, 1, color='k', ls='--')
+        plt.xlabel('Time (ms)')
+        plt.ylabel('V (mV)')
+    else:
+        axis.plot(range_t, v, 'b')
+        axis.axhline(V_th, 0, 1, color='k', ls='--')
+        axis.set_xlabel('Time (ms)')
+        axis.set_ylabel('V (mV)')
 
 def plot_raster_Poisson(range_t, spike_train, n):
     '''
