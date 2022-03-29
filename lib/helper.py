@@ -1,7 +1,7 @@
 import numpy as np                 # import numpy
 import matplotlib.pyplot as plt    # import matplotlib
 
-def plot_volt_trace(pars, v, sp, axis=None):
+def plot_volt_trace(pars, v, sp, c='b', axis=None):
     '''
     Plot trajetory of membrane potential for a single neuron
   
@@ -21,12 +21,12 @@ def plot_volt_trace(pars, v, sp, axis=None):
        v[sp_num] += 10
 
     if axis is None:
-        plt.plot(range_t, v, 'b')
+        plt.plot(range_t, v, color=c)
         plt.axhline(V_th, 0, 1, color='k', ls='--')
         plt.xlabel('Time (ms)')
         plt.ylabel('V (mV)')
     else:
-        axis.plot(range_t, v, 'b')
+        axis.plot(range_t, v, color=c)
         axis.axhline(V_th, 0, 1, color='k', ls='--')
         axis.set_xlabel('Time (ms)')
         axis.set_ylabel('V (mV)')

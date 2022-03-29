@@ -22,7 +22,7 @@ class LIF:
     V_th: float = -45.          # spike threshold [mV]
     V_reset: float = -65.       # reset potential [mV]
     E_L: float = -75.           # leak reversal potential [mV]
-    tau_m: float = 10.          # membrane time constant [ms]
+    tau_m: float = 20.          # membrane time constant [ms]
     g_L: float = 10.            # leak conductance [nS]
     tref: float = 2.            # refractory time (ms)
 
@@ -36,8 +36,8 @@ class LIF:
 
     #! adaptation
     a: float = 0.           # subthreshold adaptation
-    b: float = 25.          # spiking adaptation
-    tau_w: float = 100.     #ms
+    b: float = 3.          # spiking adaptation
+    tau_w: float = 30.     #ms
     delatT: float = 2.
     v_rh: float = -50.
 
@@ -76,6 +76,7 @@ class LIF:
         self.v[0] = self.V_init
         self.tr = 0.
         self.spike = 0
+        self.spikes = {'times':[], 'senders':[]}
 
         # initi synapses
         for itype in ['Spikes', 'Istep']:
@@ -111,7 +112,7 @@ class LIF:
             spike_in = inp['buffer'][-1]
             # update input weight
             weight = inp['syn'].__update__(spike_in)
-            if inp['syn'].weight > 0:
+            if weight > 0:
                 pre_spike_ex += spike_in * weight
             else:
                 pre_spike_in += spike_in * weight
@@ -148,6 +149,8 @@ class LIF:
             self.v[it] =  self.V_reset
             self.tr = self.tref/dt
             self.spike = 1
+            self.spikes['times'].append(it*dt)
+            self.spikes['senders'].append(self.idx)
 
         # update the synaptic conductance
         self.gE[it+1] = self.gE[it] - (dt/self.tau_syn_E)*self.gE[it] + self.gE_bar*pre_spike_ex
@@ -156,12 +159,13 @@ class LIF:
         # calculate the increment of the membrane potential 
         dv_reg = -(self.v[it]-self.E_L)
         dv_inj = self.delatT * np.exp((self.v[it]-self.v_rh)/self.delatT)
-        dv_spk = (self.gE[it+1]/g_L)*(self.v[it]-self.VE) - (self.gI[it+1]/g_L)*(self.v[it]-self.VI)
+        # dv_inj = 0.
+        dv_spk = -(self.gE[it+1]/g_L)*(self.v[it]-self.VE) - (self.gI[it+1]/g_L)*(self.v[it]-self.VI)
         dv_cur = I/g_L
         self.dv[it+1] = (dv_reg + dv_inj + dv_spk + dv_cur) * (dt/self.tau_m)
 
         # adaptation
-        self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-self.E_L) + self.b*self.tau_w*self.spike)* (dt/self.tau_w)
+        self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-self.E_L) + self.b*self.tau_w*self.spike)*(dt/self.tau_w)
 
         # update membrane potential
         self.v[it+1] = self.v[it] + self.dv[it+1] - self.w[it]/g_L
