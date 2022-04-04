@@ -19,11 +19,11 @@ class LIF:
 
     #! neuron parameters
     V_init: float = -70.        # initial potential [mV]
-    V_th: float = -45.          # spike threshold [mV]
-    V_reset: float = -65.       # reset potential [mV]
-    E_L: float = -75.           # leak reversal potential [mV]
+    V_th: float = -40.          # spike threshold [mV]
+    V_reset: float = -55.       # reset potential [mV]
+    E_L: float = -70.           # leak reversal potential [mV]
     tau_m: float = 20.          # membrane time constant [ms]
-    g_L: float = 10.            # leak conductance [nS]
+    g_L: float = 2.            # leak conductance [nS]
     tref: float = 2.            # refractory time (ms)
 
     #! synaptic parameters
@@ -69,7 +69,7 @@ class LIF:
         self.Lt = Lt
 
         # dynamics variables
-        self.rec_spikes = []
+        self.states = np.zeros(int(self.Lt/self.dt))
         self.v, self.dv, self.gE, self.gI, self.w = np.zeros(Lt), np.zeros(Lt), np.zeros(Lt), np.zeros(Lt), np.zeros(Lt)
 
         # init states
@@ -82,6 +82,13 @@ class LIF:
         for itype in ['Spikes', 'Istep']:
             for inp in self.inp[itype]:
                 inp['buffer'] = deque(int(inp['syn'].delay/dt+1)*[0], int(inp['syn'].delay/dt)+1)
+
+    def update(self, params):
+        for k,v in params.items():
+            try:
+                setattr(self, k, v)
+            except:
+                "Invalid parameter for LIF neuron."
 
     def connect(self, device, synspec):
         """Connect device to neuron with specification on synapse
@@ -145,12 +152,12 @@ class LIF:
             self.v[it] = self.V_reset
             self.tr -= 1
         elif self.v[it] >= self.V_th:          # reset voltage and record spike event
-            self.rec_spikes.append(it*dt)
             self.v[it] =  self.V_reset
             self.tr = self.tref/dt
             self.spike = 1
             self.spikes['times'].append(it*dt)
             self.spikes['senders'].append(self.idx)
+        self.states[it] = self.spike
 
         # update the synaptic conductance
         self.gE[it+1] = self.gE[it] - (dt/self.tau_syn_E)*self.gE[it] + self.gE_bar*pre_spike_ex
