@@ -16,6 +16,21 @@ class StaticCon():
     def __update__(self, spike):
         return self.weight
 
+class GapCon():
+    """Static synapse"""
+    #! parameters
+    weight: float = 1.
+
+    def __init__(self, synspec):
+        for k,v in synspec.items():
+            try:
+                setattr(self, k, v)
+            except:
+                "Invalid parameter for static synapse!"
+
+    def __update__(self, spike):
+        return abs(self.weight)
+
 class FaciCon():
     """Facilitating synapse"""
     #! parameters

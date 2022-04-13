@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt    # import matplotlib
 from dataclasses import dataclass
 from collections import deque
 
-from .conn import StaticCon, FaciCon, DeprCon
+from .conn import *
 
 @dataclass
 class LIF:
@@ -51,7 +51,7 @@ class LIF:
         self.sim.cnt += 1
         self.sim.devices.append(self)
 
-        self.inp = {'Spikes':[], 'Istep':[]}
+        self.inp = {'Spikes':[], 'Istep':[], 'gap':[]}
 
     def __initsim__(self, Lt, dt):
         """Initialization for simualtion
@@ -96,13 +96,16 @@ class LIF:
         Args:
             device (instance): input device
             synspec (dict): weight, delay, etc.
-        """        
-        if synspec['ctype'] == 'static':
-            self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
-        elif synspec['ctype'] == 'facilitate':
-            self.inp[device.otype].append({'device':device, 'syn':FaciCon(synspec)})
-        elif synspec['ctype'] == 'depress':
-            self.inp[device.otype].append({'device':device, 'syn':DeprCon(synspec)})
+        """
+        if synspec['weight'] != 0:        
+            if synspec['ctype'] == 'static':
+                self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
+            elif synspec['ctype'] == 'facilitate':
+                self.inp[device.otype].append({'device':device, 'syn':FaciCon(synspec)})
+            elif synspec['ctype'] == 'depress':
+                self.inp[device.otype].append({'device':device, 'syn':DeprCon(synspec)})
+            elif synspec['ctype'] == 'gap':
+                self.inp['gap'].append({'device':device, 'syn':GapCon(synspec)})
 
     def __load_in__(self):
         """Load input from input devices
@@ -162,14 +165,19 @@ class LIF:
         # update the synaptic conductance
         self.gE[it+1] = self.gE[it] - (dt/self.tau_syn_E)*self.gE[it] + self.gE_bar*pre_spike_ex
         self.gI[it+1] = self.gI[it] - (dt/self.tau_syn_I)*self.gI[it] + self.gI_bar*np.absolute(pre_spike_in)
+
+        # update gap junctions
+        dv_gap = 0.
+        if 'gap' in self.inp:
+            for gap in self.inp['gap']:
+                dv_gap -= gap['syn'].weight*(self.dv[it] - gap['device'].dv[it])/g_L
             
-        # calculate the increment of the membrane potential 
+        # calculate the increment of the membrane potential
         dv_reg = -(self.v[it]-self.E_L)
         dv_inj = self.delatT * np.exp((self.v[it]-self.v_rh)/self.delatT)
-        # dv_inj = 0.
         dv_spk = -(self.gE[it+1]/g_L)*(self.v[it]-self.VE) - (self.gI[it+1]/g_L)*(self.v[it]-self.VI)
         dv_cur = I/g_L
-        self.dv[it+1] = (dv_reg + dv_inj + dv_spk + dv_cur) * (dt/self.tau_m)
+        self.dv[it+1] = (dv_reg + dv_inj + dv_spk + dv_cur + dv_gap) * (dt/self.tau_m)
 
         # adaptation
         self.w[it+1] = self.w[it] + (-self.w[it] + self.a*(self.v[it]-self.E_L) + self.b*self.tau_w*self.spike)*(dt/self.tau_w)
