@@ -46,10 +46,6 @@ def pair_volt_trace(pars, vs, sps, axis=None):
 
     V_ths = pars['V_ths']
     dt = pars['dt']
-    for sp, v in zip(sps, vs):
-        if sp.size:
-            sp_num = (sp/dt).astype(int)-1
-            v[sp_num] += 10
 
     cs = ['b', 'r']
 
@@ -57,13 +53,13 @@ def pair_volt_trace(pars, vs, sps, axis=None):
         plt.plot(vs[0], vs[1], color='k')
         plt.axhline(V_ths[0], 0, 1, color=cs[0], ls='--')
         plt.axvline(V_ths[1], 0, 1, color=cs[1], ls='--')
-        plt.xlabel('Time (ms)')
+        plt.xlabel('V (mV)')
         plt.ylabel('V (mV)')
     else:
         axis.plot(vs[0], vs[1], color='k')
         axis.axhline(V_ths[0], 0, 1, color=cs[0], ls='--')
         axis.axvline(V_ths[1], 0, 1, color=cs[1], ls='--')
-        axis.set_xlabel('Time (ms)')
+        axis.set_xlabel('V (mV)')
         axis.set_ylabel('V (mV)')
 
 def plot_raster_Poisson(range_t, spike_train, n):
