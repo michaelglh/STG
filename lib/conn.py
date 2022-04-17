@@ -28,7 +28,7 @@ class GapCon():
             except:
                 "Invalid parameter for static synapse!"
 
-    def __update__(self, spike):
+    def __update__(self):
         return abs(self.weight)
 
 class FaciCon():
@@ -38,7 +38,7 @@ class FaciCon():
     delay: float = 5.   # ms
 
     p_init: float = 0.5
-    fF: float = 0.01    # facilitation strength
+    fF: float = 1.0    # facilitation strength
     tau_FP: float = 2e2 # facilitation time constant
 
     def __init__(self, synspec):
@@ -69,7 +69,7 @@ class DeprCon():
     delay: float = 5.   # ms
 
     p_init: float = 0.5
-    fD: float = 0.1    # depression scale
+    fD: float = 1.0    # depression scale
     tau_DP: float = 5e2 # depression time constant
 
     def __init__(self, synspec):

@@ -170,7 +170,8 @@ class LIF:
         dv_gap = 0.
         if 'gap' in self.inp:
             for gap in self.inp['gap']:
-                dv_gap -= gap['syn'].weight*(self.dv[it] - gap['device'].dv[it])/g_L
+                weight = gap['syn'].__update__()
+                dv_gap -= weight*(self.dv[it] - gap['device'].dv[it])/g_L
             
         # calculate the increment of the membrane potential
         dv_reg = -(self.v[it]-self.E_L)
