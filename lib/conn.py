@@ -29,7 +29,7 @@ class GapCon():
                 "Invalid parameter for static synapse!"
 
     def __update__(self):
-        return abs(self.weight)*5
+        return abs(self.weight)
 
 class FaciCon():
     """Facilitating synapse"""
@@ -39,7 +39,7 @@ class FaciCon():
 
     p_init: float = 0.5
     fF: float = 0.5    # facilitation strength
-    tau_FP: float = 2e2 # facilitation time constant
+    tau_FP: float = 1e3 # facilitation time constant
 
     def __init__(self, synspec):
         for k,v in synspec.items():

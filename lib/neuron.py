@@ -168,10 +168,9 @@ class LIF:
 
         # update gap junctions
         dv_gap = 0.
-        if 'gap' in self.inp:
-            for gap in self.inp['gap']:
-                weight = gap['syn'].__update__()
-                dv_gap -= weight*(self.dv[it] - gap['device'].dv[it])/g_L
+        for gap in self.inp['gap']:
+            weight = gap['syn'].__update__()
+            dv_gap -= weight*(self.v[it] - gap['device'].v[it])/g_L
             
         # calculate the increment of the membrane potential
         dv_reg = -(self.v[it]-self.E_L)

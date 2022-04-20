@@ -47,7 +47,7 @@ def pair_volt_trace(pars, vs, sps, axis=None):
     V_ths = pars['V_ths']
     dt = pars['dt']
 
-    cs = ['b', 'r']
+    cs = ['r', 'b']
 
     if axis is None:
         plt.plot(vs[0], vs[1], color='k')
