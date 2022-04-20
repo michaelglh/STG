@@ -69,8 +69,8 @@ class DeprCon():
     delay: float = 5.   # ms
 
     p_init: float = 0.5
-    fD: float = 0.5    # depression scale
-    tau_DP: float = 5e2 # depression time constant
+    fD: float = 0.2     # depression scale
+    tau_DP: float = 1e3 # depression time constant
 
     def __init__(self, synspec):
         for k,v in synspec.items():
