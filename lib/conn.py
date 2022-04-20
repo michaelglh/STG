@@ -38,7 +38,7 @@ class FaciCon():
     delay: float = 5.   # ms
 
     p_init: float = 0.5
-    fF: float = 1.0    # facilitation strength
+    fF: float = 0.5    # facilitation strength
     tau_FP: float = 2e2 # facilitation time constant
 
     def __init__(self, synspec):
@@ -69,7 +69,7 @@ class DeprCon():
     delay: float = 5.   # ms
 
     p_init: float = 0.5
-    fD: float = 1.0    # depression scale
+    fD: float = 0.5    # depression scale
     tau_DP: float = 5e2 # depression time constant
 
     def __init__(self, synspec):
