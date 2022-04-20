@@ -29,7 +29,7 @@ class GapCon():
                 "Invalid parameter for static synapse!"
 
     def __update__(self):
-        return abs(self.weight)
+        return abs(self.weight)*5
 
 class FaciCon():
     """Facilitating synapse"""
