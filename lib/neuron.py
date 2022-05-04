@@ -43,6 +43,11 @@ class LIF:
 
     #! state of neuron
     spike: int = 0          # spiking or not
+    rt: float = 0.          # instanenous rate
+    tau_rt: float = 1e2     # time constant for instaneous rate
+
+    mu_v: float = 0.        # average membrane potential
+    v_tau: float = 1e3      # time constant for average v
 
     def __post_init__(self):
         """Initialize device
@@ -51,7 +56,7 @@ class LIF:
         self.sim.cnt += 1
         self.sim.devices.append(self)
 
-        self.inp = {'Spikes':[], 'Istep':[], 'gap':[]}
+        self.inp = {'chem':[], 'gap':[], 'plastic':[]}
 
     def __initsim__(self, Lt, dt):
         """Initialization for simualtion
@@ -74,13 +79,14 @@ class LIF:
 
         # init states
         self.v[0] = self.V_init
+        self.mu_v = self.V_init
         self.tr = 0.
         self.spike = 0
         self.spikes = {'times':[], 'senders':[]}
 
-        # initi synapses
-        for itype in ['Spikes', 'Istep']:
-            for inp in self.inp[itype]:
+        # init synapses
+        for stype in ['chem', 'plastic']:
+            for inp in self.inp[stype]:
                 inp['buffer'] = deque(int(inp['syn'].delay/dt+1)*[0], int(inp['syn'].delay/dt)+1)
 
     def update(self, params):
@@ -97,43 +103,65 @@ class LIF:
             device (instance): input device
             synspec (dict): weight, delay, etc.
         """
-        if synspec['weight'] != 0:        
-            if synspec['ctype'] == 'static':
-                self.inp[device.otype].append({'device':device, 'syn':StaticCon(synspec)})
-            elif synspec['ctype'] == 'facilitate':
-                self.inp[device.otype].append({'device':device, 'syn':FaciCon(synspec)})
-            elif synspec['ctype'] == 'depress':
-                self.inp[device.otype].append({'device':device, 'syn':DeprCon(synspec)})
-            elif synspec['ctype'] == 'gap':
-                self.inp['gap'].append({'device':device, 'syn':GapCon(synspec)})
+        if synspec['weight'] != 0:
+            synClass = globals()[synspec['ctype'] + 'Con']
+            syn = synClass(synspec)
+            self.inp[syn.stype].append({'device':device, 'syn':syn})
+            return syn
+        else:
+            return None
+            
 
-    def __load_in__(self):
+    def __load_in__(self, it):
         """Load input from input devices
+        Args:
+            it (int): current iteration index
 
         Returns:
             excitatory spikes, inhibitory spikes and current flow
         """
-        # spike trains
         pre_spike_ex = 0.
         pre_spike_in = 0.
-        for inp in self.inp['Spikes']:
-            # update input buffer
-            inp['buffer'].appendleft(inp['device'].spike)
-            spike_in = inp['buffer'][-1]
-            # update input weight
-            weight = inp['syn'].__update__(spike_in)
-            if weight > 0:
-                pre_spike_ex += spike_in * weight
-            else:
-                pre_spike_in += spike_in * weight
-
-        # current injections
         I = 0.
-        for inp in self.inp['Istep']:
-            inp['buffer'].appendleft(inp['device'].current)
-            I += inp['buffer'][-1] * inp['syn'].weight
 
-        return pre_spike_ex, pre_spike_in, I
+        # update chemical synapses
+        for inp in self.inp['chem']:
+            if inp['device'].otype == 'Spikes':
+                # update input buffer
+                inp['buffer'].appendleft(inp['device'].spike)
+                spike_in = inp['buffer'][-1]
+                # update input weight
+                weight = inp['syn'].__update__(spike_in)
+                if weight > 0:
+                    pre_spike_ex += spike_in * weight
+                else:
+                    pre_spike_in += spike_in * weight
+            else:
+                inp['buffer'].appendleft(inp['device'].current)
+                I += inp['buffer'][-1] * inp['syn'].weight
+
+        # update gap junctions
+        dv_gap = 0.
+        for gap in self.inp['gap']:
+            weight = gap['syn'].__update__()
+            dv_gap -= weight*(self.v[it] - gap['device'].v[it])/self.g_L
+
+        # update plastic synapses
+        for inp in self.inp['plastic']:
+            if inp['device'].otype == 'Spikes':
+                # update input buffer
+                inp['buffer'].appendleft(inp['device'].spike)
+                spike_in = inp['buffer'][-1]
+                # update input weight
+                weight = inp['syn'].__update__(inp['device'], self)
+                if weight > 0:
+                    pre_spike_ex += spike_in * weight
+                else:
+                    pre_spike_in += spike_in * weight
+            else:
+                assert False
+
+        return pre_spike_ex, pre_spike_in, I, dv_gap
 
     def __step__(self, it):
         """Simulation for one step
@@ -149,7 +177,7 @@ class LIF:
         dt = self.dt
 
         # update dynamic variables
-        pre_spike_ex, pre_spike_in, I = self.__load_in__()
+        pre_spike_ex, pre_spike_in, I, dv_gap = self.__load_in__(it)
         self.spike = 0
         if self.tr > 0:                      # freactory period
             self.v[it] = self.V_reset
@@ -165,12 +193,6 @@ class LIF:
         # update the synaptic conductance
         self.gE[it+1] = self.gE[it] - (dt/self.tau_syn_E)*self.gE[it] + self.gE_bar*pre_spike_ex
         self.gI[it+1] = self.gI[it] - (dt/self.tau_syn_I)*self.gI[it] + self.gI_bar*np.absolute(pre_spike_in)
-
-        # update gap junctions
-        dv_gap = 0.
-        for gap in self.inp['gap']:
-            weight = gap['syn'].__update__()
-            dv_gap -= weight*(self.v[it] - gap['device'].v[it])/g_L
             
         # calculate the increment of the membrane potential
         dv_reg = -(self.v[it]-self.E_L)
@@ -184,6 +206,11 @@ class LIF:
 
         # update membrane potential
         self.v[it+1] = self.v[it] + self.dv[it+1] - self.w[it]/g_L
+
+        # update neuron state
+        if len(self.spikes['times']) > 0:
+            self.rt += (-self.rt/self.tau_rt + self.spike)*dt
+        self.mu_v += (-self.mu_v + self.v)*(dt/self.v_tau)
 
         return self.v[it+1]
     

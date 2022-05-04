@@ -11,6 +11,8 @@ class Poisson_generator():
     #! parameters
     rate: float = 1.        # Hz
     seed: int = None
+    start: int = 0
+    end: int = int(1e4)
 
     #! state of generator
     spike: int = 0          # spiking or not
@@ -45,6 +47,8 @@ class Poisson_generator():
         
         # generate Poisson train
         self.spike_train = 1. * (u_rand < self.rate*self.dt/1e3)
+        self.spike_train[0:self.start] = 0
+        self.spike_train[self.end:] = 0
 
         # initial state
         self.spike = self.spike_train[0]
@@ -69,11 +73,16 @@ class Poisson_generator():
 class Current_injector():
     """Step-wise current injection"""
     sim: any
-    Is: any
     otype: str = 'Istep'  # type
+
+    #! parameters
+    rate: float = 0.
+    start: int = 0
+    end: int = int(1e4)
 
     #! state of generator
     current: int = 0          # spiking or not
+    
 
     def __post_init__(self):
         """Initialize device
@@ -93,6 +102,11 @@ class Current_injector():
         """
         self.Lt = Lt
         self.dt = dt
+
+        # generate uniformly distributed random variables
+        self.Is = np.ones(Lt)*self.rate
+        self.Is[0:self.start] = 0
+        self.Is[self.end:] = 0
 
     def __step__(self, it):
         """Update current output state
@@ -120,6 +134,8 @@ class Gaussian_generator():
     mean: float = 0.        # 
     std: float = 1.         # 
     seed: int = None
+    start: int = 0
+    end: int = int(1e4)
 
     #! state of generator
     current: int = 0          # spiking or not
@@ -151,6 +167,8 @@ class Gaussian_generator():
 
         # generate uniformly distributed random variables
         self.Is = np.random.normal(self.mean, self.std, Lt)
+        self.Is[0:self.start] = 0
+        self.Is[self.end:] = 0
         
     def __step__(self, it):
         """Update current output state
