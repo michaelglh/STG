@@ -107,10 +107,15 @@ class HebbCon():
     delay: float = 5.   # ms
     stype: str = 'plastic'
 
-    gamma_2: float = 1e-5
+    gamma_2: float = 1e-1
     wmax: float = 2.0
     beta: float = 1.0
-    gamma_0: float = 1e-4
+    gamma_0: float = 1e-3
+
+    trace_x: float = 0.
+    tau_x: float = 1e3
+    trace_y: float = 0.
+    tau_y: float = 1e3
 
     def __init__(self, synspec):
         for k,v in synspec.items():
@@ -130,8 +135,9 @@ class HebbCon():
         Returns:
             float: synaptic weight
         """
-
-        self.weight +=  (self.gamma_2 * pow(self.wmax - self.weight, self.beta) * pre.rt * post.rt - self.gamma_0 * self.weight)*pre.dt
+        self.trace_x += (-self.trace_x/self.tau_x + pre.spike)*pre.dt
+        self.trace_y += (-self.trace_y/self.tau_y + post.spike)*post.dt
+        self.weight +=  (self.gamma_2 * pow(self.wmax - self.weight, self.beta) * self.trace_x * self.trace_y - self.gamma_0 * self.weight)*pre.dt
         self.weight = min(self.weight, self.wmax)
 
         self.weights.append(self.weight)     
@@ -146,6 +152,10 @@ class CompCon():
     stype: str = 'plastic'
 
     lam: float = 1e-1
+    trace_x: float = 0.
+    tau_x: float = 1e2
+    trace_y: float = 0.
+    tau_y: float = 1e2
 
     def __init__(self, synspec):
         for k,v in synspec.items():
@@ -166,7 +176,9 @@ class CompCon():
             float: synaptic weight
         """
 
-        self.weight +=  self.lam*(post.rt*(pre.rt-self.weight))*pre.dt
+        self.trace_x += (-self.trace_x/self.tau_x + pre.spike)*pre.dt
+        self.trace_y += (-self.trace_y/self.tau_y + post.spike)*post.dt
+        self.weight +=  self.lam*(self.trace_y*(self.trace_x-self.weight))*pre.dt
 
         self.weights.append(self.weight)     
 
@@ -184,7 +196,7 @@ class STDPCon():
     trace_y: float = 0.
     tau_y: float = 1e1
 
-    lam: float = 1e2
+    lam: float = 2e1
     alph: float = 0.5
 
     def __init__(self, synspec):
