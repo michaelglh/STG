@@ -107,15 +107,15 @@ class HebbCon():
     delay: float = 5.   # ms
     stype: str = 'plastic'
 
-    gamma_2: float = 1e-1
+    gamma: float = 1e-2
     wmax: float = 2.0
     beta: float = 1.0
-    gamma_0: float = 1e-3
 
     trace_x: float = 0.
-    tau_x: float = 1e3
+    tau_x: float = 1e2
+    trace_th: float = 1.0
     trace_y: float = 0.
-    tau_y: float = 1e3
+    tau_y: float = 3e2
 
     def __init__(self, synspec):
         for k,v in synspec.items():
@@ -137,8 +137,8 @@ class HebbCon():
         """
         self.trace_x += (-self.trace_x/self.tau_x + pre.spike)*pre.dt
         self.trace_y += (-self.trace_y/self.tau_y + post.spike)*post.dt
-        self.weight +=  (self.gamma_2 * pow(self.wmax - self.weight, self.beta) * self.trace_x * self.trace_y - self.gamma_0 * self.weight)*pre.dt
-        self.weight = min(self.weight, self.wmax)
+        self.weight +=  self.gamma * pow(self.wmax - self.weight, self.beta) * (self.trace_x - self.trace_th*pre.dt) * self.trace_y
+        self.weight = max(min(self.weight, self.wmax), 0.)
 
         self.weights.append(self.weight)     
 
